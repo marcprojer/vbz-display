@@ -104,11 +104,13 @@ class DisplayView {
       liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
       int lineNumber = rowIndex * 13;
+      uint16_t badgeBg = getLineBadgeBackground(line);
+      uint16_t badgeFg = getLineBadgeTextColor(line);
 
-      dmaDisplay->fillRect(0, lineNumber, 24, 11, kBlue);
+      dmaDisplay->fillRect(0, lineNumber, 24, 11, badgeBg);
 
       int xPos = getRightAlignStartingPoint(lineBuf, 23);
-      dmaDisplay->setTextColor(kWhite);
+      dmaDisplay->setTextColor(badgeFg);
       dmaDisplay->setCursor(xPos, lineNumber);
       dmaDisplay->print(lineBuf);
 
@@ -145,6 +147,70 @@ class DisplayView {
   uint16_t kWhite = 0;
   uint16_t kYellow = 0;
   uint16_t kBlue = 0;
+
+  int extractLineNumber(const String& line) {
+    String digits = "";
+    for (size_t i = 0; i < line.length(); i++) {
+      char c = line.charAt(i);
+      if (c >= '0' && c <= '9') {
+        digits += c;
+      }
+    }
+    if (digits.length() == 0) {
+      return -1;
+    }
+    return digits.toInt();
+  }
+
+  uint16_t getLineBadgeBackground(const String& line) {
+    int lineNo = extractLineNumber(line);
+    switch (lineNo) {
+      case 3: return dmaDisplay->color565(0, 137, 47);
+      case 4: return dmaDisplay->color565(17, 41, 111);
+      case 6: return dmaDisplay->color565(202, 125, 60);
+      case 7: return dmaDisplay->color565(0, 0, 0);
+      case 8: return dmaDisplay->color565(138, 181, 31);
+      case 9: return dmaDisplay->color565(17, 41, 111);
+      case 11: return dmaDisplay->color565(0, 137, 47);
+      case 13: return dmaDisplay->color565(255, 193, 0);
+      case 14: return dmaDisplay->color565(0, 141, 197);
+      case 17: return dmaDisplay->color565(142, 34, 77);
+      case 50: return dmaDisplay->color565(0, 0, 0);
+      case 51: return dmaDisplay->color565(0, 0, 0);
+      case 33: return dmaDisplay->color565(218, 214, 156);
+      case 46: return dmaDisplay->color565(193, 213, 159);
+      case 72: return dmaDisplay->color565(198, 166, 147);
+      case 83: return dmaDisplay->color565(255, 255, 255);
+      default: return kBlue;
+    }
+  }
+
+  uint16_t getLineBadgeTextColor(const String& line) {
+    int lineNo = extractLineNumber(line);
+    switch (lineNo) {
+      // Tram lines
+      case 3: return kWhite;
+      case 4: return kWhite;
+      case 6: return kBlack;
+      case 7: return kWhite;
+      case 8: return kBlack;
+      case 9: return kWhite;
+      case 11: return kWhite;
+      case 13: return kBlack;
+      case 14: return kWhite;
+      case 17: return kWhite;
+      case 50: return kWhite;
+      case 51: return kWhite;
+
+      // Bus lines
+      case 33: return kBlack;
+      case 46: return kBlack;
+      case 72: return kBlack;
+      case 83: return kBlack;
+
+      default: return kWhite;
+    }
+  }
 
   uint8_t getRightAlignStartingPoint(const char* str, int16_t width) {
     GFXcanvas1 canvas(width, 16);
