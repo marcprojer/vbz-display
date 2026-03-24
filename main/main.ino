@@ -5,10 +5,13 @@
 #include <time.h>
 #include "config.h"
 #include "display.h"
+#include "homeassistant.h"
 
 unsigned long lastPollMs = 0;
 bool clockSynced = false;
 DisplayView displayView;
+HomeAssistantControl haControl;
+bool panelAwake = false;
 
 String buildStationboardUrl() {
 	String url = "https://transport.opendata.ch/v1/stationboard";
@@ -167,6 +170,27 @@ struct SortedDeparture {
 	int sortEtaMin;
 };
 
+bool categoryMatchesMode(const char* category, VehicleFilterMode mode) {
+	if (mode == VehicleFilterMode::All) {
+		return true;
+	}
+
+	String cat = safeString(category);
+	cat.toLowerCase();
+
+	bool isTram = (cat == "t" || cat == "tram");
+	bool isBus = (cat == "b" || cat == "bus");
+
+	if (mode == VehicleFilterMode::Tram) {
+		return isTram;
+	}
+	if (mode == VehicleFilterMode::Bus) {
+		return isBus;
+	}
+
+	return true;
+}
+
 void fetchAndPrintDepartures() {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.println("Kein WLAN, Abfrage uebersprungen.");
@@ -242,6 +266,11 @@ void fetchAndPrintDepartures() {
 			break;
 		}
 
+		const char* category = connection["category"];
+		if (!categoryMatchesMode(category, haControl.getMode())) {
+			continue;
+		}
+
 		const char* number = connection["number"];
 		const char* name = connection["name"];
 		const char* destination = connection["to"];
@@ -315,17 +344,29 @@ void setup() {
 	displayView.begin();
 
 	connectWiFi();
+	haControl.begin(HA_WEBHOOK_TOKEN, WAKE_DURATION_MINUTES);
+	haControl.wakeForMinutes(WAKE_DURATION_MINUTES);
+	panelAwake = haControl.isAwake();
+	displayView.setPanelAwake(panelAwake);
 	fetchAndPrintDepartures();
 	lastPollMs = millis();
 }
 
 void loop() {
+	haControl.handle();
+
 	if (WiFi.status() != WL_CONNECTED) {
 		connectWiFi();
 	}
 
+	bool awakeNow = haControl.isAwake();
+	if (awakeNow != panelAwake) {
+		panelAwake = awakeNow;
+		displayView.setPanelAwake(panelAwake);
+	}
+
 	unsigned long now = millis();
-	if (now - lastPollMs >= POLL_INTERVAL_MS) {
+	if (panelAwake && now - lastPollMs >= POLL_INTERVAL_MS) {
 		fetchAndPrintDepartures();
 		lastPollMs = now;
 	}

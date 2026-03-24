@@ -70,7 +70,23 @@ class DisplayView {
     dmaDisplay->fillScreen(kBlack);
     dmaDisplay->setFont(&vbzfont);
     dmaDisplay->setTextSize(1);
+    normalBrightness = 48;
+    panelEnabled = true;
     matrixReady = true;
+  }
+
+  void setPanelAwake(bool awake) {
+    if (!matrixReady || dmaDisplay == nullptr) {
+      return;
+    }
+
+    panelEnabled = awake;
+    if (awake) {
+      dmaDisplay->setBrightness8(normalBrightness);
+    } else {
+      dmaDisplay->fillScreen(kBlack);
+      dmaDisplay->setBrightness8(0);
+    }
   }
 
   void showDeparturesHeader(const char* stationKey, size_t count) {
@@ -89,7 +105,7 @@ class DisplayView {
   }
 
   void showDepartureRow(const DepartureDisplayRow& row) {
-    if (matrixReady && rowIndex < 5) {
+    if (matrixReady && panelEnabled && rowIndex < 5) {
       String line = row.line;
       line.replace(" ", "");
       line.trim();
@@ -140,7 +156,9 @@ class DisplayView {
  private:
   MatrixPanel_I2S_DMA* dmaDisplay = nullptr;
   bool matrixReady = false;
+  bool panelEnabled = true;
   uint8_t rowIndex = 0;
+  uint8_t normalBrightness = 48;
 
   uint16_t kBlack = 0;
   uint16_t kWhite = 0;
