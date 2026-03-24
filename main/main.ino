@@ -162,6 +162,11 @@ String safeString(const char* value) {
 	return String("-");
 }
 
+struct SortedDeparture {
+	DepartureDisplayRow row;
+	int sortEtaMin;
+};
+
 void fetchAndPrintDepartures() {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.println("Kein WLAN, Abfrage uebersprungen.");
@@ -229,9 +234,14 @@ void fetchAndPrintDepartures() {
 		return;
 	}
 
-	displayView.showDeparturesHeader(STATION_KEY, stationboard.size());
+	SortedDeparture sortedRows[RESULT_LIMIT];
+	size_t sortedCount = 0;
 
 	for (JsonObject connection : stationboard) {
+		if (sortedCount >= RESULT_LIMIT) {
+			break;
+		}
+
 		const char* number = connection["number"];
 		const char* name = connection["name"];
 		const char* destination = connection["to"];
@@ -268,7 +278,32 @@ void fetchAndPrintDepartures() {
 		row.direction = safeString(destination);
 		row.delay = delayText;
 		row.liveIn = etaText;
-		displayView.showDepartureRow(row);
+
+		SortedDeparture item;
+		item.row = row;
+		item.sortEtaMin = (etaMin >= 0) ? etaMin : 32767;
+		sortedRows[sortedCount++] = item;
+	}
+
+	// Sort by "Live in" ascending so the next real departure is shown first.
+	for (size_t i = 0; i < sortedCount; i++) {
+		size_t minIndex = i;
+		for (size_t j = i + 1; j < sortedCount; j++) {
+			if (sortedRows[j].sortEtaMin < sortedRows[minIndex].sortEtaMin) {
+				minIndex = j;
+			}
+		}
+		if (minIndex != i) {
+			SortedDeparture tmp = sortedRows[i];
+			sortedRows[i] = sortedRows[minIndex];
+			sortedRows[minIndex] = tmp;
+		}
+	}
+
+	displayView.showDeparturesHeader(STATION_KEY, sortedCount);
+
+	for (size_t i = 0; i < sortedCount; i++) {
+		displayView.showDepartureRow(sortedRows[i].row);
 	}
 }
 

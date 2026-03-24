@@ -37,12 +37,12 @@ class DisplayView {
  public:
   void begin() {
     HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
-    mxconfig.gpio.r1 = R1_PIN;
-    mxconfig.gpio.g1 = G1_PIN;
-    mxconfig.gpio.b1 = B1_PIN;
-    mxconfig.gpio.r2 = R2_PIN;
-    mxconfig.gpio.g2 = G2_PIN;
-    mxconfig.gpio.b2 = B2_PIN;
+    mxconfig.gpio.r1 = G1_PIN;
+    mxconfig.gpio.g1 = B1_PIN;
+    mxconfig.gpio.b1 = R1_PIN;
+    mxconfig.gpio.r2 = G2_PIN;
+    mxconfig.gpio.g2 = B2_PIN;
+    mxconfig.gpio.b2 = R2_PIN;
     mxconfig.gpio.a = A_PIN;
     mxconfig.gpio.b = B_PIN;
     mxconfig.gpio.c = C_PIN;
