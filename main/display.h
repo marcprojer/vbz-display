@@ -37,6 +37,9 @@ class DisplayView {
  public:
   void begin() {
     HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
+    mxconfig.i2sspeed = HUB75_I2S_CFG::HZ_10M;
+    mxconfig.clkphase = false;
+    mxconfig.min_refresh_rate = 90;
     mxconfig.gpio.r1 = G1_PIN;
     mxconfig.gpio.g1 = B1_PIN;
     mxconfig.gpio.b1 = R1_PIN;
@@ -55,7 +58,8 @@ class DisplayView {
     dmaDisplay = new MatrixPanel_I2S_DMA(mxconfig);
     dmaDisplay->begin();
     dmaDisplay->setTextWrap(false);
-    dmaDisplay->setBrightness8(64);
+    dmaDisplay->setLatBlanking(2);
+    dmaDisplay->setBrightness8(48);
 
     kBlack = dmaDisplay->color565(0, 0, 0);
     kWhite = dmaDisplay->color565(255, 255, 255);
@@ -107,6 +111,8 @@ class DisplayView {
       uint16_t badgeBg = getLineBadgeBackground(line);
       uint16_t badgeFg = getLineBadgeTextColor(line);
 
+      // Clear the whole row first to avoid glyph leftovers/ghost pixels.
+      dmaDisplay->fillRect(0, lineNumber, 128, 11, kBlack);
       dmaDisplay->fillRect(0, lineNumber, 24, 11, badgeBg);
 
       int xPos = getRightAlignStartingPoint(lineBuf, 23);
