@@ -253,11 +253,12 @@ void fetchAndPrintDepartures() {
 		int delayMin = stopObj["delay"] | 0;
 
 		time_t liveTs = parseIsoDateTimeToEpoch(liveIso);
+		bool hasLiveData = liveTs > 0;
 		time_t effectiveTs = liveTs > 0 ? liveTs : (time_t)plannedTs;
 
 		String delayText = String("-");
 		if (hasLiveDelay) {
-			delayText = String(delayMin);
+			delayText = String(delayMin) + " min";
 		}
 
 		int etaMin = minutesUntilDeparture(effectiveTs);
@@ -265,7 +266,8 @@ void fetchAndPrintDepartures() {
 		if (etaMin == 0) {
 			etaText = "\x1E";  // VBZ "sofort" icon from vbzfont
 		} else if (etaMin > 0) {
-			etaText = String(etaMin);
+			String liveMarker = hasLiveData ? "`" : "'";
+			etaText = String(etaMin) + liveMarker;
 		}
 
 		String line = safeString(number);

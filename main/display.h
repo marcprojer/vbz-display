@@ -95,16 +95,13 @@ class DisplayView {
       line.trim();
       
       String dir = cropDestination(row.direction);
-      String delay = row.delay;
       String liveIn = row.liveIn;
 
       char lineBuf[20];
       char dirBuf[30];
-      char delayBuf[12];
       char liveBuf[12];
       line.toCharArray(lineBuf, sizeof(lineBuf));
       dir.toCharArray(dirBuf, sizeof(dirBuf));
-      delay.toCharArray(delayBuf, sizeof(delayBuf));
       liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
       int lineNumber = rowIndex * 13;
@@ -123,10 +120,6 @@ class DisplayView {
       dmaDisplay->setTextColor(kYellow);
       dmaDisplay->setCursor(27, lineNumber);
       dmaDisplay->print(dirBuf);
-
-      xPos = getRightAlignStartingPoint(delayBuf, 16);
-      dmaDisplay->setCursor(97 + xPos, lineNumber);
-      dmaDisplay->print(delayBuf);
 
       xPos = getRightAlignStartingPoint(liveBuf, 16);
       dmaDisplay->setCursor(112 + xPos, lineNumber);
@@ -254,15 +247,17 @@ class DisplayView {
     
     destination.trim();
 
-    // Calculate max width (70px for destination column)
+    // Delay is no longer shown on panel, so destination can use more width.
+    // Keep some gap before the right-aligned live-in column at x=112.
+    const int maxDestinationWidthPx = 84;
     bool textWasTooLong = false;
-    while (getTextUsedLength(destination) > 70 && destination.length() > 0) {
+    while (getTextUsedLength(destination) > maxDestinationWidthPx && destination.length() > 0) {
       destination = destination.substring(0, destination.length() - 1);
       textWasTooLong = true;
     }
 
     // Fallback guard for fonts where pixel width estimation can differ.
-    while (destination.length() > 11) {
+    while (destination.length() > 14) {
       destination = destination.substring(0, destination.length() - 1);
       textWasTooLong = true;
     }
