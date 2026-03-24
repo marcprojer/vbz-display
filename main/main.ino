@@ -252,7 +252,9 @@ void fetchAndPrintDepartures() {
 
 		int etaMin = minutesUntilDeparture(effectiveTs);
 		String etaText = String("-");
-		if (etaMin >= 0) {
+		if (etaMin == 0) {
+			etaText = "\x1E";  // VBZ "sofort" icon from vbzfont
+		} else if (etaMin > 0) {
 			etaText = String(etaMin);
 		}
 

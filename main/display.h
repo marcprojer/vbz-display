@@ -1,21 +1,30 @@
 #pragma once
 
 #include <Arduino.h>
-#include <SmartMatrix3.h>
 #include <Adafruit_GFX.h>
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#include "vbzfont.h"
 
-// Basiskonfiguration
-#define DISPLAY_COLOR_DEPTH 24
-#define DISPLAY_WIDTH 128
-#define DISPLAY_HEIGHT 64
-#define DISPLAY_REFRESH_DEPTH 24
-#define DISPLAY_DMA_BUFFER_ROWS 4
-#define DISPLAY_PANEL_TYPE SMARTMATRIX_HUB75_64ROW_MOD32SCAN
-#define DISPLAY_MATRIX_OPTIONS SMARTMATRIX_OPTIONS_NONE
-#define DISPLAY_BACKGROUND_OPTIONS SM_BACKGROUND_OPTIONS_NONE
+// HUB75 panel configuration for 128x64 (2x 64x64 chained)
+#define PANEL_RES_X 64
+#define PANEL_RES_Y 64
+#define PANEL_CHAIN 2
 
-SMARTMATRIX_ALLOCATE_BUFFERS(matrix, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_REFRESH_DEPTH, DISPLAY_DMA_BUFFER_ROWS, DISPLAY_PANEL_TYPE, DISPLAY_MATRIX_OPTIONS);
-SMARTMATRIX_ALLOCATE_BACKGROUND_LAYER(backgroundLayer, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_COLOR_DEPTH, DISPLAY_BACKGROUND_OPTIONS);
+// ESP32 HUB75 default wiring
+#define R1_PIN 2
+#define G1_PIN 15
+#define B1_PIN 4
+#define R2_PIN 16
+#define G2_PIN 27
+#define B2_PIN 17
+#define A_PIN 5
+#define B_PIN 18
+#define C_PIN 19
+#define D_PIN 21
+#define E_PIN 12
+#define LAT_PIN 26
+#define OE_PIN 25
+#define CLK_PIN 22
 
 struct DepartureDisplayRow {
   String line;
@@ -27,13 +36,36 @@ struct DepartureDisplayRow {
 class DisplayView {
  public:
   void begin() {
-    matrix.addLayer(&backgroundLayer);
-    matrix.begin();
-    matrix.setBrightness((25 * 255) / 100);
-    backgroundLayer.enableColorCorrection(true);
-    backgroundLayer.setFont(font6x10);
-    backgroundLayer.fillScreen(kBlack);
-    backgroundLayer.swapBuffers();
+    HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
+    mxconfig.gpio.r1 = R1_PIN;
+    mxconfig.gpio.g1 = G1_PIN;
+    mxconfig.gpio.b1 = B1_PIN;
+    mxconfig.gpio.r2 = R2_PIN;
+    mxconfig.gpio.g2 = G2_PIN;
+    mxconfig.gpio.b2 = B2_PIN;
+    mxconfig.gpio.a = A_PIN;
+    mxconfig.gpio.b = B_PIN;
+    mxconfig.gpio.c = C_PIN;
+    mxconfig.gpio.d = D_PIN;
+    mxconfig.gpio.e = E_PIN;
+    mxconfig.gpio.lat = LAT_PIN;
+    mxconfig.gpio.oe = OE_PIN;
+    mxconfig.gpio.clk = CLK_PIN;
+
+    dmaDisplay = new MatrixPanel_I2S_DMA(mxconfig);
+    dmaDisplay->begin();
+    dmaDisplay->setTextWrap(false);
+    dmaDisplay->setBrightness8(64);
+
+    kBlack = dmaDisplay->color565(0, 0, 0);
+    kWhite = dmaDisplay->color565(255, 255, 255);
+    kYellow = dmaDisplay->color565(252, 249, 110);
+    kBlue = dmaDisplay->color565(0, 102, 255);
+
+    dmaDisplay->clearScreen();
+    dmaDisplay->fillScreen(kBlack);
+    dmaDisplay->setFont(&vbzfont);
+    dmaDisplay->setTextSize(1);
     matrixReady = true;
   }
 
@@ -41,8 +73,7 @@ class DisplayView {
     rowIndex = 0;
 
     if (matrixReady) {
-      backgroundLayer.fillScreen(kBlack);
-      backgroundLayer.swapBuffers();
+      dmaDisplay->fillScreen(kBlack);
     }
 
     Serial.print("Abfahrten fuer ");
@@ -73,26 +104,26 @@ class DisplayView {
       liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
       int lineNumber = rowIndex * 13;
-      
-      // Line background (blue) - draw filled rectangle with lines
-      for (int i = 0; i < 11; i++) {
-        backgroundLayer.drawLine(0, lineNumber + i, 24, lineNumber + i, kBlue);
-      }
+
+      dmaDisplay->fillRect(0, lineNumber, 24, 11, kBlue);
+
       int xPos = getRightAlignStartingPoint(lineBuf, 23);
-      backgroundLayer.drawString(xPos, lineNumber, kWhite, lineBuf);
-      
-      // Destination (left-aligned)
-      backgroundLayer.drawString(27, lineNumber, kYellow, dirBuf);
-      
-      // Delay (right-aligned ~97)
+      dmaDisplay->setTextColor(kWhite);
+      dmaDisplay->setCursor(xPos, lineNumber);
+      dmaDisplay->print(lineBuf);
+
+      dmaDisplay->setTextColor(kYellow);
+      dmaDisplay->setCursor(27, lineNumber);
+      dmaDisplay->print(dirBuf);
+
       xPos = getRightAlignStartingPoint(delayBuf, 16);
-      backgroundLayer.drawString(97 + xPos, lineNumber, kYellow, delayBuf);
-      
-      // TTA (right-aligned ~112)
+      dmaDisplay->setCursor(97 + xPos, lineNumber);
+      dmaDisplay->print(delayBuf);
+
       xPos = getRightAlignStartingPoint(liveBuf, 16);
-      backgroundLayer.drawString(112 + xPos, lineNumber, kYellow, liveBuf);
-      
-      backgroundLayer.swapBuffers();
+      dmaDisplay->setCursor(112 + xPos, lineNumber);
+      dmaDisplay->print(liveBuf);
+
       rowIndex++;
     }
 
@@ -106,19 +137,24 @@ class DisplayView {
   }
 
  private:
+  MatrixPanel_I2S_DMA* dmaDisplay = nullptr;
   bool matrixReady = false;
   uint8_t rowIndex = 0;
 
-  const rgb24 kBlack = {0, 0, 0};
-  const rgb24 kWhite = {255, 255, 255};
-  const rgb24 kYellow = {252, 249, 110};
-  const rgb24 kBlue = {255, 0, 0};  // SmartMatrix3 might use BGR order: B,G,R
+  uint16_t kBlack = 0;
+  uint16_t kWhite = 0;
+  uint16_t kYellow = 0;
+  uint16_t kBlue = 0;
 
   uint8_t getRightAlignStartingPoint(const char* str, int16_t width) {
-    // Estimate text width: font6x10 is ~6px per character
-    int textLen = strlen(str);
-    int textWidth = textLen * 6;
-    int xPos = width - textWidth;
+    GFXcanvas1 canvas(width, 16);
+    canvas.setFont(&vbzfont);
+    canvas.setTextSize(1);
+    canvas.setTextWrap(false);
+    canvas.setCursor(0, 0);
+    canvas.print(str);
+    int advance = canvas.getCursorX() + 1;
+    int xPos = width - advance;
     return (xPos > 0) ? xPos : 0;
   }
 
@@ -168,6 +204,9 @@ class DisplayView {
 
   int getTextUsedLength(String text) {
     GFXcanvas1 canvas(128, 16);
+    canvas.setFont(&vbzfont);
+    canvas.setTextSize(1);
+    canvas.setTextWrap(false);
     canvas.setCursor(0, 0);
     canvas.print(text);
     return canvas.getCursorX() + 1;
