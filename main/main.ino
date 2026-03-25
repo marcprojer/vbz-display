@@ -140,6 +140,11 @@ void connectWiFi() {
 	Serial.println(WIFI_SSID);
 
 	WiFi.mode(WIFI_STA);
+	if (USE_STATIC_IP) {
+		if (!WiFi.config(STATIC_IP, STATIC_GATEWAY, STATIC_SUBNET, STATIC_DNS1, STATIC_DNS2)) {
+			Serial.println("Statische IP-Konfiguration fehlgeschlagen, nutze DHCP.");
+		}
+	}
 	WiFi.begin(WIFI_SSID, WIFI_PASS);
 
 	uint8_t tries = 0;
