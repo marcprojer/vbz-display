@@ -79,6 +79,22 @@ class HomeAssistantControl {
       server.send(200, "application/json", response);
     });
 
+    server.on("/scroll_up", HTTP_GET, [this]() {
+      if (!isAuthorized()) {
+        return;
+      }
+      scrollUpRequested = true;
+      server.send(200, "application/json", "{\"ok\":true,\"action\":\"scroll_up\"}");
+    });
+
+    server.on("/scroll_down", HTTP_GET, [this]() {
+      if (!isAuthorized()) {
+        return;
+      }
+      scrollDownRequested = true;
+      server.send(200, "application/json", "{\"ok\":true,\"action\":\"scroll_down\"}");
+    });
+
     server.begin();
   }
 
@@ -115,6 +131,18 @@ class HomeAssistantControl {
     return pending;
   }
 
+  bool consumeScrollUpRequest() {
+    bool pending = scrollUpRequested;
+    scrollUpRequested = false;
+    return pending;
+  }
+
+  bool consumeScrollDownRequest() {
+    bool pending = scrollDownRequested;
+    scrollDownRequested = false;
+    return pending;
+  }
+
   void sleepNow() {
     wakeUntilMs = 0;
     mode = VehicleFilterMode::All;
@@ -129,6 +157,8 @@ class HomeAssistantControl {
   uint16_t wakeDefaultMinutes = 5;
   bool wasAwake = false;
   bool refreshRequested = false;
+  bool scrollUpRequested = false;
+  bool scrollDownRequested = false;
 
   String modeToString(VehicleFilterMode m) const {
     switch (m) {

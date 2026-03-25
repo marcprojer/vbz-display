@@ -442,11 +442,25 @@ void loop() {
 
 	unsigned long now = millis();
 	if (panelAwake && haControl.consumeRefreshRequest()) {
+		displayView.scrollReset();
+		fetchAndPrintDepartures();
+		lastPollMs = now;
+	}
+
+	if (panelAwake && haControl.consumeScrollUpRequest()) {
+		displayView.scrollUp();
+		fetchAndPrintDepartures();
+		lastPollMs = now;
+	}
+
+	if (panelAwake && haControl.consumeScrollDownRequest()) {
+		displayView.scrollDown();
 		fetchAndPrintDepartures();
 		lastPollMs = now;
 	}
 
 	if (panelAwake && now - lastPollMs >= POLL_INTERVAL_MS) {
+		displayView.scrollReset();
 		fetchAndPrintDepartures();
 		lastPollMs = now;
 	}

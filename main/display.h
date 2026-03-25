@@ -91,6 +91,8 @@ class DisplayView {
 
   void showDeparturesHeader(const char* stationKey, size_t count) {
     rowIndex = 0;
+    // Store total count for scroll boundary checking
+    totalRows = count;
 
     if (matrixReady) {
       dmaDisplay->fillScreen(kBlack);
@@ -104,8 +106,40 @@ class DisplayView {
     Serial.println("Linie | Richtung | Delay | Live in");
   }
 
+  void scrollUp() {
+    if (scrollOffset > 0) {
+      scrollOffset--;
+      // Uncomment for 3-row scrolling:
+      // if (scrollOffset >= 3) scrollOffset -= 3;
+      // else scrollOffset = 0;
+    }
+  }
+
+  void scrollDown() {
+    // Max offset = totalRows - 5 (to keep 5 rows visible)
+    int maxOffset = (totalRows > 5) ? (totalRows - 5) : 0;
+    if (scrollOffset < maxOffset) {
+      scrollOffset++;
+      // Uncomment for 3-row scrolling:
+      // if (scrollOffset + 3 <= maxOffset) scrollOffset += 3;
+      // else scrollOffset = maxOffset;
+    }
+  }
+
+  int getScrollOffset() const {
+    return scrollOffset;
+  }
+
+  size_t getTotalRows() const {
+    return totalRows;
+  }
+
+  void scrollReset() {
+    scrollOffset = 0;
+  }
   void showDepartureRow(const DepartureDisplayRow& row) {
-    if (matrixReady && panelEnabled && rowIndex < 5) {
+    // Only render if row is within visible range
+    if (matrixReady && panelEnabled && rowIndex >= scrollOffset && rowIndex < (scrollOffset + 5)) {
       String line = row.line;
       line.replace(" ", "");
       line.trim();
@@ -123,7 +157,9 @@ class DisplayView {
       dir.toCharArray(dirBuf, sizeof(dirBuf));
       liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
-      int lineNumber = rowIndex * 13;
+      // Calculate Y position relative to viewport (0-based within visible area)
+      int viewportRow = rowIndex - scrollOffset;
+      int lineNumber = viewportRow * 13;
       uint16_t badgeBg = getLineBadgeBackground(line);
       uint16_t badgeFg = getLineBadgeTextColor(line);
 
@@ -161,6 +197,8 @@ class DisplayView {
   bool matrixReady = false;
   bool panelEnabled = true;
   uint8_t rowIndex = 0;
+    int scrollOffset = 0;
+    size_t totalRows = 0;
   uint8_t normalBrightness = 48;
 
   uint16_t kBlack = 0;
