@@ -4,6 +4,7 @@
 #include <Adafruit_GFX.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "vbzfont.h"
+#include "config.h"
 
 // HUB75 panel configuration for 128x64 (2x 64x64 chained)
 #define PANEL_RES_X 64
@@ -59,7 +60,7 @@ class DisplayView {
     dmaDisplay->begin();
     dmaDisplay->setTextWrap(false);
     dmaDisplay->setLatBlanking(2);
-    dmaDisplay->setBrightness8(48);
+    dmaDisplay->setBrightness8(DISPLAY_BRIGHTNESS);
 
     kBlack = dmaDisplay->color565(0, 0, 0);
     kWhite = dmaDisplay->color565(255, 255, 255);
@@ -70,7 +71,7 @@ class DisplayView {
     dmaDisplay->fillScreen(kBlack);
     dmaDisplay->setFont(&vbzfont);
     dmaDisplay->setTextSize(1);
-    normalBrightness = 48;
+    normalBrightness = DISPLAY_BRIGHTNESS;
     panelEnabled = true;
     matrixReady = true;
   }
@@ -199,7 +200,7 @@ class DisplayView {
   uint8_t rowIndex = 0;
     int scrollOffset = 0;
     size_t totalRows = 0;
-  uint8_t normalBrightness = 48;
+  uint8_t normalBrightness = DISPLAY_BRIGHTNESS;
 
   uint16_t kBlack = 0;
   uint16_t kWhite = 0;
