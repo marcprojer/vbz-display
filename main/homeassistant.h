@@ -24,7 +24,16 @@ class HomeAssistantControl {
       }
       uint16_t mins = getMinutesArg(wakeDefaultMinutes);
       wakeForMinutes(mins);
+      refreshRequested = true;
       server.send(200, "application/json", "{\"ok\":true,\"action\":\"wake\"}");
+    });
+
+    server.on("/sleep", HTTP_GET, [this]() {
+      if (!isAuthorized()) {
+        return;
+      }
+      sleepNow();
+      server.send(200, "application/json", "{\"ok\":true,\"action\":\"sleep\",\"mode\":\"all\"}");
     });
 
     server.on("/motion", HTTP_GET, [this]() {
@@ -34,6 +43,7 @@ class HomeAssistantControl {
       uint16_t mins = getMinutesArg(wakeDefaultMinutes);
       mode = VehicleFilterMode::All;
       wakeForMinutes(mins);
+      refreshRequested = true;
       server.send(200, "application/json", "{\"ok\":true,\"action\":\"motion\",\"mode\":\"all\"}");
     });
 
@@ -62,6 +72,7 @@ class HomeAssistantControl {
 
       uint16_t mins = getMinutesArg(wakeDefaultMinutes);
       wakeForMinutes(mins);
+      refreshRequested = true;
 
       String response = "{\"ok\":true,\"mode\":\"" + modeToString(mode) + "\"}";
       server.send(200, "application/json", response);
@@ -108,6 +119,18 @@ class HomeAssistantControl {
     return mode;
   }
 
+  bool consumeRefreshRequest() {
+    bool pending = refreshRequested;
+    refreshRequested = false;
+    return pending;
+  }
+
+  void sleepNow() {
+    wakeUntilMs = 0;
+    mode = VehicleFilterMode::All;
+    refreshRequested = false;
+  }
+
  private:
   WebServer server;
   String authToken;
@@ -115,6 +138,7 @@ class HomeAssistantControl {
   unsigned long wakeUntilMs = 0;
   uint16_t wakeDefaultMinutes = 5;
   bool wasAwake = false;
+  bool refreshRequested = false;
 
   String modeToString(VehicleFilterMode m) const {
     switch (m) {

@@ -17,7 +17,7 @@ String buildStationboardUrl() {
 	String url = "https://transport.opendata.ch/v1/stationboard";
 	url += "?id=" + String(STATION_ID);
 	url += "&station=" + String(STATION_KEY);
-	url += "&limit=" + String(RESULT_LIMIT);
+	url += "&limit=" + String(API_FETCH_LIMIT);
 	url += "&transportations%5B%5D=tram";
 	url += "&transportations%5B%5D=bus";
 	url += "&fields%5B%5D=stationboard%2Fcategory";
@@ -247,10 +247,19 @@ void fetchAndPrintDepartures() {
 		Serial.println(payloadSize);
 	}
 
-	DynamicJsonDocument doc(20 * 1024);
-	WiFiClient* stream = http.getStreamPtr();
-	DeserializationError err = deserializeJson(doc, *stream);
+	String payload = http.getString();
 	http.end();
+
+	if (payload.length() == 0) {
+		Serial.println("JSON Fehler: EmptyInput (leerer HTTP-Body)");
+		return;
+	}
+
+	Serial.print("Body Bytes: ");
+	Serial.println(payload.length());
+
+	DynamicJsonDocument doc(20 * 1024);
+	DeserializationError err = deserializeJson(doc, payload);
 	if (err) {
 		Serial.print("JSON Fehler: ");
 		Serial.println(err.c_str());
@@ -371,6 +380,11 @@ void loop() {
 	}
 
 	unsigned long now = millis();
+	if (panelAwake && haControl.consumeRefreshRequest()) {
+		fetchAndPrintDepartures();
+		lastPollMs = now;
+	}
+
 	if (panelAwake && now - lastPollMs >= POLL_INTERVAL_MS) {
 		fetchAndPrintDepartures();
 		lastPollMs = now;

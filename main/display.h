@@ -195,6 +195,7 @@ class DisplayView {
       case 50: return dmaDisplay->color565(0, 0, 0);
       case 51: return dmaDisplay->color565(0, 0, 0);
       case 33: return dmaDisplay->color565(218, 214, 156);
+      case 32: return dmaDisplay->color565(204, 178, 209);
       case 46: return dmaDisplay->color565(193, 213, 159);
       case 72: return dmaDisplay->color565(198, 166, 147);
       case 83: return dmaDisplay->color565(255, 255, 255);
@@ -220,6 +221,7 @@ class DisplayView {
       case 51: return kWhite;
 
       // Bus lines
+      case 32: return kBlack;
       case 33: return kBlack;
       case 46: return kBlack;
       case 72: return kBlack;
