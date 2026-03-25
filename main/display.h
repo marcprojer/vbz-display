@@ -112,6 +112,9 @@ class DisplayView {
       
       String dir = cropDestination(row.direction);
       String liveIn = row.liveIn;
+      if (liveIn == "0") {
+        liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
+      }
 
       char lineBuf[20];
       char dirBuf[30];

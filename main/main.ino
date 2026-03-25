@@ -196,6 +196,44 @@ bool categoryMatchesMode(const char* category, VehicleFilterMode mode) {
 	return true;
 }
 
+String readHttpBodyFast(HTTPClient& http, uint32_t idleTimeoutMs) {
+	WiFiClient* stream = http.getStreamPtr();
+	if (!stream) {
+		return String();
+	}
+
+	String payload;
+	int contentLength = http.getSize();
+	if (contentLength > 0) {
+		payload.reserve((size_t)contentLength + 8);
+	}
+
+	unsigned long lastDataMs = millis();
+	size_t bytesRead = 0;
+	
+	while (http.connected() || stream->available() > 0) {
+		while (stream->available() > 0) {
+			char c = (char)stream->read();
+			payload += c;
+			bytesRead++;
+			lastDataMs = millis();
+			
+			// If we know content length and have read all bytes, return immediately
+			if (contentLength > 0 && bytesRead >= (size_t)contentLength) {
+				return payload;
+			}
+		}
+
+		// If no data available and idle timeout passed, stop
+		if (millis() - lastDataMs >= idleTimeoutMs) {
+			break;
+		}
+		delay(1);
+	}
+
+	return payload;
+}
+
 void fetchAndPrintDepartures() {
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.println("Kein WLAN, Abfrage uebersprungen.");
@@ -204,8 +242,17 @@ void fetchAndPrintDepartures() {
 
 	ensureClockSync();
 
+	IPAddress apiIp;
+	if (!WiFi.hostByName("transport.opendata.ch", apiIp)) {
+		Serial.println("DNS Fehler: transport.opendata.ch nicht aufloesbar.");
+		return;
+	}
+	Serial.print("API Host IP: ");
+	Serial.println(apiIp);
+
 	WiFiClientSecure client;
 	client.setInsecure();
+ 	client.setTimeout(10000);
 
 	HTTPClient http;
 	String url = buildStationboardUrl();
@@ -220,26 +267,29 @@ void fetchAndPrintDepartures() {
 		return;
 	}
 	http.useHTTP10(true);
-	http.setTimeout(15000);
+	http.setReuse(false);
+	http.addHeader("Connection", "close");
+	http.setConnectTimeout(4000);
+	http.setTimeout(5000);
 
+	unsigned long getStartMs = millis();
 	int httpCode = http.GET();
+	unsigned long getDurationMs = millis() - getStartMs;
 	if (httpCode <= 0) {
 		Serial.print("HTTP Fehler: ");
 		Serial.println(http.errorToString(httpCode));
+		Serial.print("GET Dauer: ");
+		Serial.print(getDurationMs);
+		Serial.println(" ms");
 		http.end();
 		return;
 	}
 
 	Serial.print("HTTP Status: ");
 	Serial.println(httpCode);
-
-	if (httpCode != HTTP_CODE_OK) {
-		String payload = http.getString();
-		Serial.println("Unerwartete API-Antwort:");
-		Serial.println(payload);
-		http.end();
-		return;
-	}
+	Serial.print("GET Dauer: ");
+	Serial.print(getDurationMs);
+	Serial.println(" ms");
 
 	int payloadSize = http.getSize();
 	if (payloadSize > 0) {
@@ -247,8 +297,19 @@ void fetchAndPrintDepartures() {
 		Serial.println(payloadSize);
 	}
 
-	String payload = http.getString();
+	unsigned long bodyStartMs = millis();
+	String payload = readHttpBodyFast(http, 2500);
+	unsigned long bodyDurationMs = millis() - bodyStartMs;
 	http.end();
+	Serial.print("Body Read Dauer: ");
+	Serial.print(bodyDurationMs);
+	Serial.println(" ms");
+
+	if (httpCode != HTTP_CODE_OK) {
+		Serial.println("Unerwartete API-Antwort:");
+		Serial.println(payload);
+		return;
+	}
 
 	if (payload.length() == 0) {
 		Serial.println("JSON Fehler: EmptyInput (leerer HTTP-Body)");
@@ -307,7 +368,7 @@ void fetchAndPrintDepartures() {
 		int etaMin = minutesUntilDeparture(effectiveTs);
 		String etaText = String("-");
 		if (etaMin == 0) {
-			etaText = "\x1E";  // VBZ "sofort" icon from vbzfont
+			etaText = "0";  // Use '0' for serial; display.h converts to glyph for panel
 		} else if (etaMin > 0) {
 			String liveMarker = hasLiveData ? "`" : "'";
 			etaText = String(etaMin) + liveMarker;
