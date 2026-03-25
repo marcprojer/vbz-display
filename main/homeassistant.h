@@ -23,9 +23,10 @@ class HomeAssistantControl {
         return;
       }
       uint16_t mins = getMinutesArg(wakeDefaultMinutes);
+      mode = VehicleFilterMode::All;
       wakeForMinutes(mins);
       refreshRequested = true;
-      server.send(200, "application/json", "{\"ok\":true,\"action\":\"wake\"}");
+      server.send(200, "application/json", "{\"ok\":true,\"action\":\"wake\",\"mode\":\"all\"}");
     });
 
     server.on("/sleep", HTTP_GET, [this]() {
@@ -34,17 +35,6 @@ class HomeAssistantControl {
       }
       sleepNow();
       server.send(200, "application/json", "{\"ok\":true,\"action\":\"sleep\",\"mode\":\"all\"}");
-    });
-
-    server.on("/motion", HTTP_GET, [this]() {
-      if (!isAuthorized()) {
-        return;
-      }
-      uint16_t mins = getMinutesArg(wakeDefaultMinutes);
-      mode = VehicleFilterMode::All;
-      wakeForMinutes(mins);
-      refreshRequested = true;
-      server.send(200, "application/json", "{\"ok\":true,\"action\":\"motion\",\"mode\":\"all\"}");
     });
 
     server.on("/mode", HTTP_GET, [this]() {
