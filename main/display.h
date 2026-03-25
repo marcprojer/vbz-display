@@ -288,20 +288,11 @@ class DisplayView {
   }
 
   String cropDestination(String destination) {
-    // normalize umlauts first to keep later replacements predictable
-    destination.replace("ä", "a");
-    destination.replace("ö", "o");
-    destination.replace("ü", "u");
-    destination.replace("Ä", "A");
-    destination.replace("Ö", "O");
-    destination.replace("Ü", "U");
-
     // remove extra text / prefixes that are not relevant
-    destination.replace("Zurich,", "");
-    destination.replace("Zurich ", "");
+    destination.replace("Zürich,", "");
+    destination.replace("Zürich ", "");
+    destination.replace("Zurich,", "");    
     destination.replace("Zurich", "");
-    destination.replace("zurich,", "");
-    destination.replace("zurich", "");
     destination.replace("Winterthur,", "");
     destination.replace("Bahnhof ", "");
 
@@ -310,6 +301,11 @@ class DisplayView {
     }
     
     destination.trim();
+
+    // Map umlauts to vbzfont glyph codes (after city filtering)
+    destination.replace("ä", "\x7B");
+    destination.replace("ö", "\x7C");
+    destination.replace("ü", "\x7D");
 
     // Delay is no longer shown on panel, so destination can use more width.
     // Keep some gap before the right-aligned live-in column at x=112.
