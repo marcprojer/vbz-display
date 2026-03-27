@@ -384,6 +384,7 @@ void fetchAndPrintDepartures() {
 		row.direction = safeString(destination);
 		row.delay = delayText;
 		row.liveIn = etaText;
+		row.category = safeString(category);
 
 		SortedDeparture item;
 		item.row = row;

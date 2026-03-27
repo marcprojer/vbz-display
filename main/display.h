@@ -32,6 +32,7 @@ struct DepartureDisplayRow {
   String direction;
   String delay;
   String liveIn;
+  String category;  // e.g., "T" for tram, "B" for bus, "BN" for night bus
 };
 
 class DisplayView {
@@ -161,8 +162,8 @@ class DisplayView {
       // Calculate Y position relative to viewport (0-based within visible area)
       int viewportRow = rowIndex - scrollOffset;
       int lineNumber = viewportRow * 13;
-      uint16_t badgeBg = getLineBadgeBackground(line);
-      uint16_t badgeFg = getLineBadgeTextColor(line);
+      uint16_t badgeBg = getLineBadgeBackground(line, row.category);
+      uint16_t badgeFg = getLineBadgeTextColor(line, row.category);
 
       // Clear the whole row first to avoid glyph leftovers/ghost pixels.
       dmaDisplay->fillRect(0, lineNumber, 128, 11, kBlack);
@@ -221,7 +222,12 @@ class DisplayView {
     return digits.toInt();
   }
 
-  uint16_t getLineBadgeBackground(const String& line) {
+  uint16_t getLineBadgeBackground(const String& line, const String& category) {
+    // Check for night buses via category (BN)
+    if (category == "BN") {
+      return dmaDisplay->color565(0, 0, 0);  // Night bus: black background
+    }
+
     int lineNo = extractLineNumber(line);
     switch (lineNo) {
       case 3: return dmaDisplay->color565(0, 137, 47);
@@ -246,7 +252,12 @@ class DisplayView {
     }
   }
 
-  uint16_t getLineBadgeTextColor(const String& line) {
+  uint16_t getLineBadgeTextColor(const String& line, const String& category) {
+    // Check for night buses via category (BN)
+    if (category == "BN") {
+      return dmaDisplay->color565(255, 242, 0);  // Night bus: yellow text (#FFF200)
+    }
+
     int lineNo = extractLineNumber(line);
     switch (lineNo) {
       // Tram lines
