@@ -28,6 +28,7 @@
 #define CLK_PIN 22
 
 struct DepartureDisplayRow {
+  String id;        // Unique ID: "number:destination:departureTimestamp"
   String line;
   String direction;
   String delay;
@@ -118,8 +119,8 @@ class DisplayView {
   }
 
   void scrollDown() {
-    // Max offset = totalRows - 5 (to keep 5 rows visible)
-    int maxOffset = (totalRows > 5) ? (totalRows - 5) : 0;
+    // Max offset = cachedRowCount - 5 (to keep 5 rows visible)
+    int maxOffset = (cachedRowCount > 5) ? (cachedRowCount - 5) : 0;
     if (scrollOffset < maxOffset) {
       scrollOffset++;
       // Uncomment for 3-row scrolling:
@@ -136,9 +137,48 @@ class DisplayView {
     return totalRows;
   }
 
+  size_t getCachedRowCount() const {
+    return cachedRowCount;
+  }
+
   void scrollReset() {
     scrollOffset = 0;
   }
+
+  void updateCachedRows(const DepartureDisplayRow newRows[], size_t newCount) {
+    // Rebuild cache in the exact order received from main.ino.
+    // main.ino already sorts by live ETA, so this keeps tram/bus mixed correctly in "all" mode.
+    const size_t maxRows = sizeof(cachedRows) / sizeof(cachedRows[0]);
+    cachedRowCount = (newCount < maxRows) ? newCount : maxRows;
+    for (size_t i = 0; i < cachedRowCount; i++) {
+      cachedRows[i] = newRows[i];
+    }
+
+    // Don't exceed valid bounds
+    if (scrollOffset >= (int)cachedRowCount) {
+      scrollOffset = (cachedRowCount > 5) ? (cachedRowCount - 5) : 0;
+    }
+
+    renderCachedRows();
+  }
+
+  void renderCachedRows() {
+    if (!matrixReady || !panelEnabled) {
+      return;
+    }
+
+    // Clear the full screen
+    dmaDisplay->fillScreen(kBlack);
+
+    // Render only visible rows (scrollOffset to scrollOffset+5)
+    for (size_t i = 0; i < cachedRowCount; i++) {
+      // Check if row is within visible range
+      if (i >= (size_t)scrollOffset && i < (size_t)(scrollOffset + 5)) {
+        renderSingleRow(cachedRows[i], i - scrollOffset);
+      }
+    }
+  }
+
   void showDepartureRow(const DepartureDisplayRow& row) {
     // Only render if row is within visible range
     if (matrixReady && panelEnabled && rowIndex >= scrollOffset && rowIndex < (scrollOffset + 5)) {
@@ -199,9 +239,53 @@ class DisplayView {
   bool matrixReady = false;
   bool panelEnabled = true;
   uint8_t rowIndex = 0;
-    int scrollOffset = 0;
-    size_t totalRows = 0;
+  int scrollOffset = 0;
+  size_t totalRows = 0;
   uint8_t normalBrightness = DISPLAY_BRIGHTNESS;
+  
+  // Row caching for scroll functionality
+  DepartureDisplayRow cachedRows[20];
+  size_t cachedRowCount = 0;
+
+  void renderSingleRow(const DepartureDisplayRow& row, int viewportRow) {
+    String line = row.line;
+    line.replace(" ", "");
+    line.trim();
+    
+    String dir = cropDestination(row.direction);
+    String liveIn = row.liveIn;
+    if (liveIn == "0") {
+      liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
+    }
+
+    char lineBuf[20];
+    char dirBuf[30];
+    char liveBuf[12];
+    line.toCharArray(lineBuf, sizeof(lineBuf));
+    dir.toCharArray(dirBuf, sizeof(dirBuf));
+    liveIn.toCharArray(liveBuf, sizeof(liveBuf));
+
+    int lineNumber = viewportRow * 13;
+    uint16_t badgeBg = getLineBadgeBackground(line, row.category);
+    uint16_t badgeFg = getLineBadgeTextColor(line, row.category);
+
+    // Clear the whole row first
+    dmaDisplay->fillRect(0, lineNumber, 128, 11, kBlack);
+    dmaDisplay->fillRect(0, lineNumber, 24, 11, badgeBg);
+
+    int xPos = getRightAlignStartingPoint(lineBuf, 23);
+    dmaDisplay->setTextColor(badgeFg);
+    dmaDisplay->setCursor(xPos, lineNumber);
+    dmaDisplay->print(lineBuf);
+
+    dmaDisplay->setTextColor(kYellow);
+    dmaDisplay->setCursor(27, lineNumber);
+    dmaDisplay->print(dirBuf);
+
+    xPos = getRightAlignStartingPoint(liveBuf, 16);
+    dmaDisplay->setCursor(112 + xPos, lineNumber);
+    dmaDisplay->print(liveBuf);
+  }
 
   uint16_t kBlack = 0;
   uint16_t kWhite = 0;

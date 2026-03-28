@@ -428,6 +428,8 @@ void fetchAndPrintDepartures() {
 		}
 
 		DepartureDisplayRow row;
+		// Generate unique ID: number:destination:plannedTs
+		row.id = String(number) + ":" + String(destination) + ":" + String(plannedTs);
 		row.line = line;
 		row.direction = safeString(destination);
 		row.delay = delayText;
@@ -455,11 +457,13 @@ void fetchAndPrintDepartures() {
 		}
 	}
 
-	displayView.showDeparturesHeader(STATION_KEY, sortedCount);
-
+	// Extract just the row data (without sortEtaMin) for cache update
+	DepartureDisplayRow rowsForCache[RESULT_LIMIT];
 	for (size_t i = 0; i < sortedCount; i++) {
-		displayView.showDepartureRow(sortedRows[i].row);
+		rowsForCache[i] = sortedRows[i].row;
 	}
+
+	displayView.updateCachedRows(rowsForCache, sortedCount);
 }
 
 void setup() {
@@ -503,14 +507,12 @@ void loop() {
 
 	if (panelAwake && haControl.consumeScrollUpRequest()) {
 		displayView.scrollUp();
-		fetchAndPrintDepartures();
-		lastPollMs = now;
+		displayView.renderCachedRows();
 	}
 
 	if (panelAwake && haControl.consumeScrollDownRequest()) {
 		displayView.scrollDown();
-		fetchAndPrintDepartures();
-		lastPollMs = now;
+		displayView.renderCachedRows();
 	}
 
 	if (panelAwake && now - lastPollMs >= POLL_INTERVAL_MS) {
