@@ -187,17 +187,11 @@ class DisplayView {
       line.trim();
       
       String dir = cropDestination(row.direction);
-      String liveIn = row.liveIn;
-      if (liveIn == "0") {
-        liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
-      }
 
       char lineBuf[20];
       char dirBuf[30];
-      char liveBuf[12];
       line.toCharArray(lineBuf, sizeof(lineBuf));
       dir.toCharArray(dirBuf, sizeof(dirBuf));
-      liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
       // Calculate Y position relative to viewport (0-based within visible area)
       int viewportRow = rowIndex - scrollOffset;
@@ -218,9 +212,7 @@ class DisplayView {
       dmaDisplay->setCursor(27, lineNumber);
       dmaDisplay->print(dirBuf);
 
-      xPos = getRightAlignStartingPoint(liveBuf, 16);
-      dmaDisplay->setCursor(112 + xPos, lineNumber);
-      dmaDisplay->print(liveBuf);
+      drawLiveInColumn(lineNumber, row.liveIn);
 
       rowIndex++;
     }
@@ -253,17 +245,11 @@ class DisplayView {
     line.trim();
     
     String dir = cropDestination(row.direction);
-    String liveIn = row.liveIn;
-    if (liveIn == "0") {
-      liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
-    }
 
     char lineBuf[20];
     char dirBuf[30];
-    char liveBuf[12];
     line.toCharArray(lineBuf, sizeof(lineBuf));
     dir.toCharArray(dirBuf, sizeof(dirBuf));
-    liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
     int lineNumber = viewportRow * 13;
     uint16_t badgeBg = getLineBadgeBackground(line, row.category);
@@ -282,9 +268,34 @@ class DisplayView {
     dmaDisplay->setCursor(27, lineNumber);
     dmaDisplay->print(dirBuf);
 
-    xPos = getRightAlignStartingPoint(liveBuf, 16);
+    drawLiveInColumn(lineNumber, row.liveIn);
+  }
+
+  void drawLiveInColumn(int lineNumber, String rawLiveIn) {
+    bool hasDelayMarker = rawLiveIn.startsWith(">");
+
+    if (rawLiveIn == "0") {
+      rawLiveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
+      hasDelayMarker = false;
+    }
+
+    if (hasDelayMarker && rawLiveIn.length() > 1) {
+      rawLiveIn = rawLiveIn.substring(1);
+    }
+
+    char liveBuf[12];
+    rawLiveIn.toCharArray(liveBuf, sizeof(liveBuf));
+
+    int xPos = getRightAlignStartingPoint(liveBuf, 16);
+    dmaDisplay->setTextColor(kYellow);
     dmaDisplay->setCursor(112 + xPos, lineNumber);
     dmaDisplay->print(liveBuf);
+
+    if (hasDelayMarker) {
+      // Keep delay marker visually separate from minutes.
+      dmaDisplay->setCursor(108, lineNumber + 1);
+      dmaDisplay->print(">");
+    }
   }
 
   uint16_t kBlack = 0;
@@ -386,9 +397,8 @@ class DisplayView {
     // remove extra text / prefixes that are not relevant
     destination.replace("Zürich,", "");
     destination.replace("Zürich ", "");
-    destination.replace("Zurich,", "");    
-    destination.replace("Zurich", "");
-    destination.replace("Winterthur,", "");
+    destination.replace(", Bahnhof", "");
+    //destination.replace(", Bahnhof Nord", "");
     destination.replace("Bahnhof ", "");
 
     while (destination.indexOf("  ") >= 0) {
@@ -402,9 +412,8 @@ class DisplayView {
     destination.replace("ö", "\x7C");
     destination.replace("ü", "\x7D");
 
-    // Delay is no longer shown on panel, so destination can use more width.
-    // Keep some gap before the right-aligned live-in column at x=112.
-    const int maxDestinationWidthPx = 84;
+    // Keep a fixed clean width for direction text for consistent row appearance.
+    const int maxDestinationWidthPx = 77;
     bool textWasTooLong = false;
     while (getTextUsedLength(destination) > maxDestinationWidthPx && destination.length() > 0) {
       destination = destination.substring(0, destination.length() - 1);

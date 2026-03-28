@@ -418,8 +418,9 @@ void fetchAndPrintDepartures() {
 		if (etaMin == 0) {
 			etaText = "0";  // Use '0' for serial; display.h converts to glyph for panel
 		} else if (etaMin > 0) {
+			String delayMarker = (hasLiveDelay && delayMin > 0) ? ">" : "";
 			String liveMarker = hasLiveData ? "`" : "'";
-			etaText = String(etaMin) + liveMarker;
+			etaText = delayMarker + String(etaMin) + liveMarker;
 		}
 
 		String line = safeString(number);
