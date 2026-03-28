@@ -22,3 +22,6 @@ build/
 *.swp
 *.swo
 *~
+
+# Local Copilot context notes
+PROJECT_CONTEXT.copilot.md

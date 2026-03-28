@@ -4,6 +4,7 @@
 #include <Adafruit_GFX.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "vbzfont.h"
+#include "config.h"
 
 // HUB75 panel configuration for 128x64 (2x 64x64 chained)
 #define PANEL_RES_X 64
@@ -27,10 +28,12 @@
 #define CLK_PIN 22
 
 struct DepartureDisplayRow {
+  String id;        // Unique ID: "number:destination:departureTimestamp"
   String line;
   String direction;
   String delay;
   String liveIn;
+  String category;  // e.g., "T" for tram, "B" for bus, "BN" for night bus
 };
 
 class DisplayView {
@@ -59,7 +62,7 @@ class DisplayView {
     dmaDisplay->begin();
     dmaDisplay->setTextWrap(false);
     dmaDisplay->setLatBlanking(2);
-    dmaDisplay->setBrightness8(48);
+    dmaDisplay->setBrightness8(DISPLAY_BRIGHTNESS);
 
     kBlack = dmaDisplay->color565(0, 0, 0);
     kWhite = dmaDisplay->color565(255, 255, 255);
@@ -70,11 +73,29 @@ class DisplayView {
     dmaDisplay->fillScreen(kBlack);
     dmaDisplay->setFont(&vbzfont);
     dmaDisplay->setTextSize(1);
+    normalBrightness = DISPLAY_BRIGHTNESS;
+    panelEnabled = true;
     matrixReady = true;
+  }
+
+  void setPanelAwake(bool awake) {
+    if (!matrixReady || dmaDisplay == nullptr) {
+      return;
+    }
+
+    panelEnabled = awake;
+    if (awake) {
+      dmaDisplay->setBrightness8(normalBrightness);
+    } else {
+      dmaDisplay->fillScreen(kBlack);
+      dmaDisplay->setBrightness8(0);
+    }
   }
 
   void showDeparturesHeader(const char* stationKey, size_t count) {
     rowIndex = 0;
+    // Store total count for scroll boundary checking
+    totalRows = count;
 
     if (matrixReady) {
       dmaDisplay->fillScreen(kBlack);
@@ -88,14 +109,88 @@ class DisplayView {
     Serial.println("Linie | Richtung | Delay | Live in");
   }
 
+  void scrollUp() {
+    if (scrollOffset > 0) {
+      scrollOffset--;
+      // Uncomment for 3-row scrolling:
+      // if (scrollOffset >= 3) scrollOffset -= 3;
+      // else scrollOffset = 0;
+    }
+  }
+
+  void scrollDown() {
+    // Max offset = cachedRowCount - 5 (to keep 5 rows visible)
+    int maxOffset = (cachedRowCount > 5) ? (cachedRowCount - 5) : 0;
+    if (scrollOffset < maxOffset) {
+      scrollOffset++;
+      // Uncomment for 3-row scrolling:
+      // if (scrollOffset + 3 <= maxOffset) scrollOffset += 3;
+      // else scrollOffset = maxOffset;
+    }
+  }
+
+  int getScrollOffset() const {
+    return scrollOffset;
+  }
+
+  size_t getTotalRows() const {
+    return totalRows;
+  }
+
+  size_t getCachedRowCount() const {
+    return cachedRowCount;
+  }
+
+  void scrollReset() {
+    scrollOffset = 0;
+  }
+
+  void updateCachedRows(const DepartureDisplayRow newRows[], size_t newCount) {
+    // Rebuild cache in the exact order received from main.ino.
+    // main.ino already sorts by live ETA, so this keeps tram/bus mixed correctly in "all" mode.
+    const size_t maxRows = sizeof(cachedRows) / sizeof(cachedRows[0]);
+    cachedRowCount = (newCount < maxRows) ? newCount : maxRows;
+    for (size_t i = 0; i < cachedRowCount; i++) {
+      cachedRows[i] = newRows[i];
+    }
+
+    // Don't exceed valid bounds
+    if (scrollOffset >= (int)cachedRowCount) {
+      scrollOffset = (cachedRowCount > 5) ? (cachedRowCount - 5) : 0;
+    }
+
+    renderCachedRows();
+  }
+
+  void renderCachedRows() {
+    if (!matrixReady || !panelEnabled) {
+      return;
+    }
+
+    // Clear the full screen
+    dmaDisplay->fillScreen(kBlack);
+
+    // Render only visible rows (scrollOffset to scrollOffset+5)
+    for (size_t i = 0; i < cachedRowCount; i++) {
+      // Check if row is within visible range
+      if (i >= (size_t)scrollOffset && i < (size_t)(scrollOffset + 5)) {
+        renderSingleRow(cachedRows[i], i - scrollOffset);
+      }
+    }
+  }
+
   void showDepartureRow(const DepartureDisplayRow& row) {
-    if (matrixReady && rowIndex < 5) {
+    // Only render if row is within visible range
+    if (matrixReady && panelEnabled && rowIndex >= scrollOffset && rowIndex < (scrollOffset + 5)) {
       String line = row.line;
       line.replace(" ", "");
       line.trim();
       
       String dir = cropDestination(row.direction);
       String liveIn = row.liveIn;
+      if (liveIn == "0") {
+        liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
+      }
 
       char lineBuf[20];
       char dirBuf[30];
@@ -104,9 +199,11 @@ class DisplayView {
       dir.toCharArray(dirBuf, sizeof(dirBuf));
       liveIn.toCharArray(liveBuf, sizeof(liveBuf));
 
-      int lineNumber = rowIndex * 13;
-      uint16_t badgeBg = getLineBadgeBackground(line);
-      uint16_t badgeFg = getLineBadgeTextColor(line);
+      // Calculate Y position relative to viewport (0-based within visible area)
+      int viewportRow = rowIndex - scrollOffset;
+      int lineNumber = viewportRow * 13;
+      uint16_t badgeBg = getLineBadgeBackground(line, row.category);
+      uint16_t badgeFg = getLineBadgeTextColor(line, row.category);
 
       // Clear the whole row first to avoid glyph leftovers/ghost pixels.
       dmaDisplay->fillRect(0, lineNumber, 128, 11, kBlack);
@@ -140,7 +237,55 @@ class DisplayView {
  private:
   MatrixPanel_I2S_DMA* dmaDisplay = nullptr;
   bool matrixReady = false;
+  bool panelEnabled = true;
   uint8_t rowIndex = 0;
+  int scrollOffset = 0;
+  size_t totalRows = 0;
+  uint8_t normalBrightness = DISPLAY_BRIGHTNESS;
+  
+  // Row caching for scroll functionality
+  DepartureDisplayRow cachedRows[20];
+  size_t cachedRowCount = 0;
+
+  void renderSingleRow(const DepartureDisplayRow& row, int viewportRow) {
+    String line = row.line;
+    line.replace(" ", "");
+    line.trim();
+    
+    String dir = cropDestination(row.direction);
+    String liveIn = row.liveIn;
+    if (liveIn == "0") {
+      liveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
+    }
+
+    char lineBuf[20];
+    char dirBuf[30];
+    char liveBuf[12];
+    line.toCharArray(lineBuf, sizeof(lineBuf));
+    dir.toCharArray(dirBuf, sizeof(dirBuf));
+    liveIn.toCharArray(liveBuf, sizeof(liveBuf));
+
+    int lineNumber = viewportRow * 13;
+    uint16_t badgeBg = getLineBadgeBackground(line, row.category);
+    uint16_t badgeFg = getLineBadgeTextColor(line, row.category);
+
+    // Clear the whole row first
+    dmaDisplay->fillRect(0, lineNumber, 128, 11, kBlack);
+    dmaDisplay->fillRect(0, lineNumber, 24, 11, badgeBg);
+
+    int xPos = getRightAlignStartingPoint(lineBuf, 23);
+    dmaDisplay->setTextColor(badgeFg);
+    dmaDisplay->setCursor(xPos, lineNumber);
+    dmaDisplay->print(lineBuf);
+
+    dmaDisplay->setTextColor(kYellow);
+    dmaDisplay->setCursor(27, lineNumber);
+    dmaDisplay->print(dirBuf);
+
+    xPos = getRightAlignStartingPoint(liveBuf, 16);
+    dmaDisplay->setCursor(112 + xPos, lineNumber);
+    dmaDisplay->print(liveBuf);
+  }
 
   uint16_t kBlack = 0;
   uint16_t kWhite = 0;
@@ -161,7 +306,12 @@ class DisplayView {
     return digits.toInt();
   }
 
-  uint16_t getLineBadgeBackground(const String& line) {
+  uint16_t getLineBadgeBackground(const String& line, const String& category) {
+    // Check for night buses via category (BN)
+    if (category == "BN") {
+      return dmaDisplay->color565(0, 0, 0);  // Night bus: black background
+    }
+
     int lineNo = extractLineNumber(line);
     switch (lineNo) {
       case 3: return dmaDisplay->color565(0, 137, 47);
@@ -176,6 +326,8 @@ class DisplayView {
       case 17: return dmaDisplay->color565(142, 34, 77);
       case 50: return dmaDisplay->color565(0, 0, 0);
       case 51: return dmaDisplay->color565(0, 0, 0);
+      case 31: return dmaDisplay->color565(165, 162, 198);
+      case 32: return dmaDisplay->color565(204, 178, 209);
       case 33: return dmaDisplay->color565(218, 214, 156);
       case 46: return dmaDisplay->color565(193, 213, 159);
       case 72: return dmaDisplay->color565(198, 166, 147);
@@ -184,7 +336,12 @@ class DisplayView {
     }
   }
 
-  uint16_t getLineBadgeTextColor(const String& line) {
+  uint16_t getLineBadgeTextColor(const String& line, const String& category) {
+    // Check for night buses via category (BN)
+    if (category == "BN") {
+      return dmaDisplay->color565(255, 242, 0);  // Night bus: yellow text (#FFF200)
+    }
+
     int lineNo = extractLineNumber(line);
     switch (lineNo) {
       // Tram lines
@@ -202,6 +359,8 @@ class DisplayView {
       case 51: return kWhite;
 
       // Bus lines
+      case 31: return kWhite;
+      case 32: return kBlack;
       case 33: return kBlack;
       case 46: return kBlack;
       case 72: return kBlack;
@@ -224,20 +383,11 @@ class DisplayView {
   }
 
   String cropDestination(String destination) {
-    // normalize umlauts first to keep later replacements predictable
-    destination.replace("ä", "a");
-    destination.replace("ö", "o");
-    destination.replace("ü", "u");
-    destination.replace("Ä", "A");
-    destination.replace("Ö", "O");
-    destination.replace("Ü", "U");
-
     // remove extra text / prefixes that are not relevant
-    destination.replace("Zurich,", "");
-    destination.replace("Zurich ", "");
+    destination.replace("Zürich,", "");
+    destination.replace("Zürich ", "");
+    destination.replace("Zurich,", "");    
     destination.replace("Zurich", "");
-    destination.replace("zurich,", "");
-    destination.replace("zurich", "");
     destination.replace("Winterthur,", "");
     destination.replace("Bahnhof ", "");
 
@@ -246,6 +396,11 @@ class DisplayView {
     }
     
     destination.trim();
+
+    // Map umlauts to vbzfont glyph codes (after city filtering)
+    destination.replace("ä", "\x7B");
+    destination.replace("ö", "\x7C");
+    destination.replace("ü", "\x7D");
 
     // Delay is no longer shown on panel, so destination can use more width.
     // Keep some gap before the right-aligned live-in column at x=112.
