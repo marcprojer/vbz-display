@@ -2,6 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <ArduinoOTA.h>
 #include <time.h>
 #include "config.h"
 #include "display.h"
@@ -12,6 +13,7 @@ bool clockSynced = false;
 DisplayView displayView;
 HomeAssistantControl haControl;
 bool panelAwake = false;
+bool otaStarted = false;
 
 String buildStationboardUrl() {
 	String url = "https://transport.opendata.ch/v1/stationboard";
@@ -161,6 +163,52 @@ void connectWiFi() {
 	} else {
 		Serial.println("WLAN-Verbindung fehlgeschlagen.");
 	}
+}
+
+void setupOtaIfNeeded() {
+	if (!OTA_ENABLED) {
+		return;
+	}
+
+	if (WiFi.status() != WL_CONNECTED) {
+		otaStarted = false;
+		return;
+	}
+
+	if (otaStarted) {
+		return;
+	}
+
+	ArduinoOTA.setHostname(OTA_HOSTNAME);
+	if (strlen(OTA_PASSWORD) > 0) {
+		ArduinoOTA.setPassword(OTA_PASSWORD);
+	}
+
+	ArduinoOTA.onStart([]() {
+		Serial.println("OTA update gestartet...");
+	});
+
+	ArduinoOTA.onEnd([]() {
+		Serial.println("OTA update abgeschlossen.");
+	});
+
+	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+		static unsigned int lastPercent = 0;
+		unsigned int percent = total > 0 ? (progress * 100U) / total : 0;
+		if (percent >= lastPercent + 10U || percent == 100U) {
+			lastPercent = percent;
+			Serial.printf("OTA Fortschritt: %u%%\n", percent);
+		}
+	});
+
+	ArduinoOTA.onError([](ota_error_t error) {
+		Serial.printf("OTA Fehler [%u]\n", (unsigned int)error);
+	});
+
+	ArduinoOTA.begin();
+	otaStarted = true;
+	Serial.print("OTA bereit. Hostname: ");
+	Serial.println(OTA_HOSTNAME);
 }
 
 String safeString(const char* value) {
@@ -420,6 +468,7 @@ void setup() {
 	displayView.begin();
 
 	connectWiFi();
+	setupOtaIfNeeded();
 	haControl.begin(HA_WEBHOOK_TOKEN, WAKE_DURATION_MINUTES);
 	haControl.wakeForMinutes(WAKE_DURATION_MINUTES);
 	panelAwake = haControl.isAwake();
@@ -433,6 +482,10 @@ void loop() {
 
 	if (WiFi.status() != WL_CONNECTED) {
 		connectWiFi();
+	}
+	setupOtaIfNeeded();
+	if (OTA_ENABLED && WiFi.status() == WL_CONNECTED) {
+		ArduinoOTA.handle();
 	}
 
 	bool awakeNow = haControl.isAwake();
