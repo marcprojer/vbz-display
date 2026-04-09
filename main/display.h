@@ -60,6 +60,7 @@ class DisplayView {
 
     dmaDisplay = new MatrixPanel_I2S_DMA(mxconfig);
     dmaDisplay->begin();
+    dmaDisplay->setRotation(2);  // Rotate output by 180 degrees.
     dmaDisplay->setTextWrap(false);
     dmaDisplay->setLatBlanking(2);
     dmaDisplay->setBrightness8(DISPLAY_BRIGHTNESS);
