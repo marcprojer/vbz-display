@@ -5,6 +5,7 @@
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "vbzfont.h"
 #include "config.h"
+#include "loading_logo.h"
 
 // HUB75 panel configuration for 128x64 (2x 64x64 chained)
 #define PANEL_RES_X 64
@@ -108,6 +109,19 @@ class DisplayView {
     Serial.print(count);
     Serial.println("):");
     Serial.println("Linie | Richtung | Delay | Live in");
+  }
+
+  void showLoadingLogo() {
+    if (!matrixReady || !panelEnabled) {
+      return;
+    }
+
+    drawLoadingLogo(dmaDisplay, kBlack);
+
+    // Restore text settings expected by row rendering.
+    dmaDisplay->setFont(&vbzfont);
+    dmaDisplay->setTextSize(1);
+    dmaDisplay->setTextWrap(false);
   }
 
   void scrollUp() {

@@ -15,6 +15,7 @@ DisplayView displayView;
 HomeAssistantControl haControl;
 bool panelAwake = false;
 bool otaStarted = false;
+bool showWakeLogoOnNextFetch = false;
 
 String buildStationboardUrl() {
 	String url = "https://transport.opendata.ch/v1/stationboard";
@@ -284,6 +285,11 @@ String readHttpBodyFast(HTTPClient& http, uint32_t idleTimeoutMs) {
 }
 
 void fetchAndPrintDepartures() {
+	if (showWakeLogoOnNextFetch) {
+		displayView.showLoadingLogo();
+		showWakeLogoOnNextFetch = false;
+	}
+
 	if (USE_TST_API) {
 		DepartureDisplayRow rowsForCache[RESULT_LIMIT];
 		size_t fakeCount = buildFakeDepartures(rowsForCache, RESULT_LIMIT, TEST_API_SCENARIO, haControl.getMode());
@@ -488,6 +494,7 @@ void setup() {
 	haControl.wakeForMinutes(WAKE_DURATION_MINUTES);
 	panelAwake = haControl.isAwake();
 	displayView.setPanelAwake(panelAwake);
+	showWakeLogoOnNextFetch = panelAwake;
 	fetchAndPrintDepartures();
 	lastPollMs = millis();
 }
@@ -507,6 +514,9 @@ void loop() {
 	if (awakeNow != panelAwake) {
 		panelAwake = awakeNow;
 		displayView.setPanelAwake(panelAwake);
+		if (panelAwake) {
+			showWakeLogoOnNextFetch = true;
+		}
 	}
 
 	unsigned long now = millis();

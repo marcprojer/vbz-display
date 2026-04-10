@@ -76,8 +76,8 @@ inline size_t buildFakeDepartures(
       addFiltered("BN", "N4", "Klusplatz", "3`", "0 min");
       addFiltered("BN", "N7", "Albisrieden", ">6`", "3 min");
       addFiltered("BN", "N8", "Werdhoelzli", "9'", "-");
-      addFiltered("BN", "N12", "Altstetten", ">14'", "-");
-      addFiltered("B", "72", "Morgental", ">18`", "0 min");
+      addFiltered("BN", "N12", "Altstetten", "14'", "-");
+      addFiltered("B", "72", "Morgental", "18`", "0 min");
       break;
 
     case 2:  // Tram focus
