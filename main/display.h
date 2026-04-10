@@ -288,8 +288,9 @@ class DisplayView {
 
   void drawLiveInColumn(int lineNumber, String rawLiveIn) {
     bool hasDelayMarker = rawLiveIn.startsWith(">");
+    bool isImmediateArrival = (rawLiveIn == "0");
 
-    if (rawLiveIn == "0") {
+    if (isImmediateArrival) {
       rawLiveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
       hasDelayMarker = false;
     }
@@ -303,12 +304,12 @@ class DisplayView {
 
     int xPos = getRightAlignStartingPoint(liveBuf, 16);
     dmaDisplay->setTextColor(kYellow);
-    dmaDisplay->setCursor(112 + xPos, lineNumber);
+    dmaDisplay->setCursor((isImmediateArrival ? 111 : 112) + xPos, lineNumber);
     dmaDisplay->print(liveBuf);
 
     if (hasDelayMarker) {
       // Keep delay marker visually separate from minutes.
-      dmaDisplay->setCursor(108, lineNumber + 1);
+      dmaDisplay->setCursor(106, lineNumber + 1);
       dmaDisplay->print(">");
     }
   }
