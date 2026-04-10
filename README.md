@@ -21,11 +21,6 @@ Live Zurich transit departure board on a 128x64 HUB75 LED matrix panel.
    - Static IP
    - Home Assistant token (optional)
 
-3. **Compile & Upload**:
-   ```bash
-   platformio run -t upload
-   ```
-
 ## Features
 
 - **Display**: 5-row scrollable departure board with line colors, times, destinations
