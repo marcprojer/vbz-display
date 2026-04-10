@@ -429,7 +429,7 @@ class DisplayView {
     destination.replace("ü", "\x7D");
 
     // Keep a fixed clean width for direction text for consistent row appearance.
-    const int maxDestinationWidthPx = 77;
+    const int maxDestinationWidthPx = 76;
     bool textWasTooLong = false;
     while (getTextUsedLength(destination) > maxDestinationWidthPx && destination.length() > 0) {
       destination = destination.substring(0, destination.length() - 1);
