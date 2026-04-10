@@ -5,6 +5,7 @@
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include "vbzfont.h"
 #include "config.h"
+#include "loading_logo.h"
 
 // HUB75 panel configuration for 128x64 (2x 64x64 chained)
 #define PANEL_RES_X 64
@@ -108,6 +109,19 @@ class DisplayView {
     Serial.print(count);
     Serial.println("):");
     Serial.println("Linie | Richtung | Delay | Live in");
+  }
+
+  void showLoadingLogo() {
+    if (!matrixReady || !panelEnabled) {
+      return;
+    }
+
+    drawLoadingLogo(dmaDisplay, kBlack);
+
+    // Restore text settings expected by row rendering.
+    dmaDisplay->setFont(&vbzfont);
+    dmaDisplay->setTextSize(1);
+    dmaDisplay->setTextWrap(false);
   }
 
   void scrollUp() {
@@ -274,8 +288,9 @@ class DisplayView {
 
   void drawLiveInColumn(int lineNumber, String rawLiveIn) {
     bool hasDelayMarker = rawLiveIn.startsWith(">");
+    bool isImmediateArrival = (rawLiveIn == "0");
 
-    if (rawLiveIn == "0") {
+    if (isImmediateArrival) {
       rawLiveIn = "\x1E";  // Convert '0' to VBZ "sofort" glyph for panel
       hasDelayMarker = false;
     }
@@ -289,12 +304,12 @@ class DisplayView {
 
     int xPos = getRightAlignStartingPoint(liveBuf, 16);
     dmaDisplay->setTextColor(kYellow);
-    dmaDisplay->setCursor(112 + xPos, lineNumber);
+    dmaDisplay->setCursor((isImmediateArrival ? 111 : 112) + xPos, lineNumber);
     dmaDisplay->print(liveBuf);
 
     if (hasDelayMarker) {
       // Keep delay marker visually separate from minutes.
-      dmaDisplay->setCursor(108, lineNumber + 1);
+      dmaDisplay->setCursor(106, lineNumber + 1);
       dmaDisplay->print(">");
     }
   }
@@ -414,7 +429,7 @@ class DisplayView {
     destination.replace("ü", "\x7D");
 
     // Keep a fixed clean width for direction text for consistent row appearance.
-    const int maxDestinationWidthPx = 77;
+    const int maxDestinationWidthPx = 76;
     bool textWasTooLong = false;
     while (getTextUsedLength(destination) > maxDestinationWidthPx && destination.length() > 0) {
       destination = destination.substring(0, destination.length() - 1);

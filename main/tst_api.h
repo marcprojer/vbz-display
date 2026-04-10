@@ -72,19 +72,19 @@ inline size_t buildFakeDepartures(
 
   switch (scenario) {
     case 1:  // Night lines focus
-      addFiltered("BN", "N1", "Central", "0", "2 min");
+      addFiltered("T", "8", "Central", "0", "2 min");
       addFiltered("BN", "N4", "Klusplatz", "3`", "0 min");
-      addFiltered("BN", "N7", "Albisrieden", ">6`", "3 min");
-      addFiltered("BN", "N8", "Werdhoelzli", "9'", "-");
-      addFiltered("BN", "N12", "Altstetten", ">14'", "-");
-      addFiltered("B", "72", "Morgental", ">18`", "0 min");
+      addFiltered("B", "72", "AlbisriedenAlbisrieden", ">6`", "3 min");
+      addFiltered("BN", "N8", "Werdhölzli", "9'", "-");
+      addFiltered("T", "50", "AltstettenAltstetten", ">14'", "-");
+      addFiltered("B", "72", "MorgentalMorgental", ">18`", "0 min");
       break;
 
     case 2:  // Tram focus
       addFiltered("T", "4", "Tiefenbrunnen", "1`", "0 min");
       addFiltered("T", "8", "Hardturm", "4`", "0 min");
       addFiltered("T", "13", "Albisguetli", ">7`", "2 min");
-      addFiltered("T", "17", "Werdhoelzli", "10'", "-");
+      addFiltered("T", "17", "Werdhölzli", "10'", "-");
       addFiltered("T", "6", "Zoo", "13'", "-");
       break;
 
