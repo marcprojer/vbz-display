@@ -7,6 +7,7 @@
 #include "config.h"
 #include "display.h"
 #include "homeassistant.h"
+#include "tst_api.h"
 
 unsigned long lastPollMs = 0;
 bool clockSynced = false;
@@ -283,6 +284,15 @@ String readHttpBodyFast(HTTPClient& http, uint32_t idleTimeoutMs) {
 }
 
 void fetchAndPrintDepartures() {
+	if (USE_TST_API) {
+		DepartureDisplayRow rowsForCache[RESULT_LIMIT];
+		size_t fakeCount = buildFakeDepartures(rowsForCache, RESULT_LIMIT, TEST_API_SCENARIO, haControl.getMode());
+		Serial.print("Fake API aktiv. Szenario: ");
+		Serial.println((int)TEST_API_SCENARIO);
+		displayView.updateCachedRows(rowsForCache, fakeCount);
+		return;
+	}
+
 	if (WiFi.status() != WL_CONNECTED) {
 		Serial.println("Kein WLAN, Abfrage uebersprungen.");
 		return;
